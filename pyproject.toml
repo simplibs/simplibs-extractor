@@ -1,0 +1,90 @@
+[build-system]
+requires = ["setuptools>=77.0.3"]                 # 77+ is needed for `license = "MIT"` (SPDX string)
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "simplibs-extractor"
+version = "0.1.0"
+description = "Gathers the text files of a folder into one document: select, read, transform with steps, render as Markdown or plain text, write atomically and report — as a Python function, a command and a two-line script, with language knowledge brought by add-ons."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"                        # the README badge and "Requires Python" must say the same
+keywords = [
+    "extractor",
+    "code-extractor",
+    "project-to-text",
+    "files",
+    "folder",
+    "markdown",
+    "llm",
+    "context",
+    "cli",
+    "command-line",
+    "profiles",
+    "plugins",
+    "simplibs",
+    "simplibs-extractor",
+    "developer-tools",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Utilities",
+    "Typing :: Typed",
+]
+dependencies = [
+    "simplibs-exception>=1.1.4",                  # structured cards behind every error
+    "simplibs-validate>=0.3.2",                   # @validate_call and @validate_dataclass
+    "simplibs-path>=0.1.1",                       # scanning, normalized and relative paths, unique names
+    "simplibs-file>=0.1.0",                       # reading, the text check, the atomic write, the backup
+    "simplibs-rules>=0.4.0",                      # Rule: the include and exclude of a config and a profile
+    "simplibs-actions>=0.2.2",                    # Action: the steps of a profile
+    "simplibs-markdown>=0.1.0",                   # the Markdown output
+    "simplibs-cli>=0.1.0",                        # prompts, failure summary, verbosity of the command
+    "simplibs-logger>=0.1.0",                     # the logger the command passes to the run
+    "simplibs-style>=0.1.0",                      # colors that disappear outside a terminal
+]
+
+[[project.authors]]
+name = "Dalibor Sova (Sudip2708)"
+email = "daliborsova@seznam.cz"
+
+[project.urls]
+Homepage = "https://github.com/simplibs/simplibs-extractor"
+Repository = "https://github.com/simplibs/simplibs-extractor"
+Issues = "https://github.com/simplibs/simplibs-extractor/issues"
+Changelog = "https://github.com/simplibs/simplibs-extractor/blob/main/CHANGELOG.md"
+
+[project.scripts]
+simplibs-extractor = "simplibs.extractor.cli:run_cli"   # run_cli returns the exit code
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0",          # the `subtests` fixture is built in since pytest 9.0
+    "pytest-cov>=5.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-v -rs"                                # -rs lists every skipped test with its reason
+
+[tool.coverage.run]
+branch = true
+source = ["simplibs.extractor"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"simplibs.extractor" = ["py.typed"]               # without this section py.typed is NOT in the wheel
