@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.1.1] - 2026-10-31
+
+### 🐛 Fixed
+
+* `extract_here(...)` and `generate_local_script(...)` now load the installed add-ons (`load_plugins()`) before they look up a profile **given as a key**; before, a profile of an add-on (`python/code-clean`) was never registered in a fresh process, so a generated script, a direct call and `simplibs-extractor init --profile …` failed with `EXTRACTOR_PROFILE_NOT_FOUND` even with the add-on installed
+* A `Profile` object or no profile (`generic/all`) does not trigger the lookup; calling it repeatedly is safe because add-ons register with `replace_existing=True`
+* `extract()` is unchanged: it still never loads add-ons on its own
+
+### 📋 Improved
+
+* Documentation of `extract_here`, `generate_local_script` and add-on loading (`README`, `README_EXTRACTOR_SCRIPTS`, `README_EXTRACTOR_PLUGINS`)
+
+---
+
 ## [0.1.0] - 2026-10-30
 
 ### ✨ Added

@@ -63,7 +63,7 @@ switch themselves off when the output is not a terminal (a pipe, a file, a log).
 | Name          | Type                      | Default | Description                                                                                          |
 |---------------|---------------------------|---------|------------------------------------------------------------------------------------------------------|
 | `anchor`      | `PathLike`                |         | `__file__` of the script — its folder is the source and the script itself is left out — or a folder. |
-| `profile`     | `Profile \| str \| None`  | `None`  | A `Profile`, a registered key, or `None` for `generic/all`.                                          |
+| `profile`     | `Profile \| str \| None`  | `None`  | A `Profile`, a registered key, or `None` for `generic/all`. A key may belong to an add-on: the installed add-ons are loaded first. |
 | `output_name` | `str \| None`             | `None`  | The output file name; by default the profile's. *(keyword-only)*                                      |
 | `quiet`       | `bool`                    | `False` | If `True`, print nothing. *(keyword-only)*                                                            |
 | `logger`      | `Any`                     | `None`  | Where progress goes (see [`extract`](logic/README_EXTRACTOR_RUN.md#extract)). *(keyword-only)*       |
@@ -132,6 +132,12 @@ added to and not replaced.
 **`output_name` is a name, not a path.** The output always lies in the script's folder. A full path belongs to
 `target=...`. The name is checked even if you also give a `target`.
 
+**Add-ons are loaded for a key.** The two-line script knows nothing about add-ons, yet its profile
+(`python/code-clean`) usually belongs to one, and in a fresh process nothing has registered it yet. So when `profile`
+is a **key**, `extract_here` first calls [`load_plugins()`](README_EXTRACTOR_PLUGINS.md#load_plugins); a `Profile`
+object or `None` (`generic/all`) needs nothing found and skips it. Calling it again is harmless — add-ons register
+with `replace_existing=True`. It is done here and not in `extract()`, which never loads add-ons on its own.
+
 **Why the profile is resolved first.** Its output name is needed to build the target, and a typo in a profile
 key should fail **first**, before anything else is done.
 
@@ -160,15 +166,19 @@ def extract_here(
     is_file = anchor_path.is_file()
     root = anchor_path.parent if is_file else anchor_path
 
-    # 2. The profile is resolved now: its output name is needed and a typo should fail first
+    # 2. A key may belong to an add-on that has not registered yet: let the installed ones do it first
+    if isinstance(profile, str):
+        load_plugins()
+
+    # 3. The profile is resolved now: its output name is needed and a typo should fail first
     chosen = resolve_profile(profile)
 
-    # 3. A file name, not a path: the output always lies in the script's folder
+    # 4. A file name, not a path: the output always lies in the script's folder
     name = output_name if output_name is not None else chosen.output_name
     if not is_valid_filename(name):
         raise_invalid_output_name_error(name)
 
-    # 4. Derived values first, then the caller's own; the script is never its own input
+    # 5. Derived values first, then the caller's own; the script is never its own input
     skipped = tuple(overrides.pop("skip_paths", ())) + ((anchor_path,) if is_file else ())
     params: dict[str, Any] = {
         "source": root,
@@ -178,7 +188,7 @@ def extract_here(
     }
     params.update(overrides)
 
-    # 5. Run, then show the outcome unless asked not to
+    # 6. Run, then show the outcome unless asked not to
     result = extract(logger=logger, **params)
     if not quiet:
         print_result(result)
@@ -204,7 +214,7 @@ command line. On the command line the same is `simplibs-extractor init`.
 | Name        | Type                     | Default | Description                                                                        |
 |-------------|--------------------------|---------|------------------------------------------------------------------------------------|
 | `path`      | `PathLike`               |         | The script file (`*.py`), or an **existing** folder, which gets `extract_here.py`. |
-| `profile`   | `Profile \| str \| None` | `None`  | A `Profile`, a registered key, or `None` for `generic/all`.                        |
+| `profile`   | `Profile \| str \| None` | `None`  | A `Profile`, a registered key, or `None` for `generic/all`. A key may belong to an add-on: the installed add-ons are loaded first. |
 | `overwrite` | `bool`                   | `False` | Replace the script if it already exists. *(keyword-only)*                           |
 
 **Returns:** the `Path` of the written script (normalized and absolute).
@@ -251,6 +261,11 @@ and the card that refuses is the one `simplibs-file` already raises.
 add-on is installed, and fail clearly where it is not. A one-off profile that was never registered therefore
 cannot be used from a generated script — register it first.
 
+**Add-ons are loaded for a key.** As in [`extract_here`](#extract_here): a key such as `python/code-clean` usually
+belongs to an add-on that has not registered yet, so for a **key** `load_plugins()` runs first. This is what lets
+`simplibs-extractor init --profile python/code-clean` and a direct call accept it. A `Profile` object or `None`
+skips the lookup.
+
 **Why the profile is resolved first.** So that a typo in the key fails **before** anything is written.
 
 **A folder must exist.** A path that is not an existing folder is taken as a file name, and a name without
@@ -276,10 +291,14 @@ def generate_local_script(
     if target.suffix != ".py":
         raise_not_python_script_error(target)
 
-    # 3. The profile is resolved now, so a typo fails before anything is written
+    # 3. A key may belong to an add-on that has not registered yet: let the installed ones do it first
+    if isinstance(profile, str):
+        load_plugins()
+
+    # 4. The profile is resolved now, so a typo fails before anything is written
     key = resolve_profile(profile).key
 
-    # 4. Written atomically; `overwrite=False` makes the file library refuse an existing script
+    # 5. Written atomically; `overwrite=False` makes the file library refuse an existing script
     return write_text(target, render_script(target.name, key), overwrite=overwrite)
 ```
 

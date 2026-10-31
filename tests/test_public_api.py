@@ -17,7 +17,7 @@ EXPECTED = {
     "FileStatus", "OutputFormat", "OverwritePolicy", "StepsSpec", "DEFAULT_PROFILE_KEY", "GENERATED_MARKER",
 }
 
-SUBPACKAGES = {"annotations", "cli", "constants", "definitions", "exceptions", "logic", "plugins", "registry", "scripts"}
+SUBPACKAGES = {"annotations", "cli", "constants", "definitions", "logic", "plugins", "registry", "scripts"}
 
 
 def test_the_public_names_are_exactly_the_agreed_ones() -> None:

@@ -99,7 +99,8 @@ Requires Python 3.11+. The command is available as `simplibs-extractor` and as
 
 A language **add-on** is installed the same way — `pip install simplibs-code-extractor` — and its
 profiles show up on their own in `simplibs-extractor --list-systems`. Nothing needs to be imported. From
-Python, call `load_plugins()` once before you look a profile up — the command does that for you.
+Python, call `load_plugins()` once before you look a profile up — the command does that for you, and so do
+`extract_here` and `generate_local_script` when they are given a profile key.
 
 The text steps used in the examples below come from
 [`simplibs-text`](https://pypi.org/project/simplibs-text/), which is **not** a dependency of the extractor:
@@ -251,7 +252,8 @@ importing it by name:
 code = "simplibs.code_extractor:register_all"            # a function with no arguments that registers profiles
 ```
 
-The command loads add-ons itself; from Python, `load_plugins()` does it (`extract()` never loads add-ons on its own).
+The command loads add-ons itself; from Python, `load_plugins()` does it (`extract()` never loads add-ons on its own; `extract_here` and
+`generate_local_script` do it for a profile key, so a generated script works as it is).
 
 ---
 
@@ -308,7 +310,7 @@ Everything a program needs is importable from `simplibs.extractor`. The command 
 exception: `from simplibs.extractor.cli import run_cli` — so a program that only calls `extract()` does
 not load the prompt and logger libraries it never uses. **Importing the package has two side effects**:
 the profile `generic/all` and the formats `markdown` and `plain` are registered. Nothing else happens
-until a function is called; add-ons are looked up only by `load_plugins()` (which the command calls).
+until a function is called; add-ons are looked up only by `load_plugins()` (which the command, `extract_here` and `generate_local_script` call).
 
 ---
 

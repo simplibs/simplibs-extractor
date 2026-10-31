@@ -34,7 +34,7 @@ list_systems()                                          # -> ['generic', 'python
 | Where you work       | What you do                                                                                              |
 |----------------------|----------------------------------------------------------------------------------------------------------|
 | **the command line** | `pip install` the add-on. The command loads add-ons itself, before its parser is built; one that fails to load is a **warning**, not a stop. |
-| **Python**           | `pip install` the add-on and call `load_plugins()` once, before you look a profile up. `extract()` does **not** load add-ons by itself. |
+| **Python**           | `pip install` the add-on and call `load_plugins()` once, before you look a profile up. `extract()` does **not** load add-ons by itself (`extract_here` and `generate_local_script` do, for a profile given as a key). |
 
 ## Writing an add-on
 
