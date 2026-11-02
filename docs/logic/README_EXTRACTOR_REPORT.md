@@ -154,9 +154,9 @@ and sizes, and the files that need attention, **errors first**.
 | 1         | `Extraction: <profile key>`                                                                           |
 | `source`  | the source folder                                                                                     |
 | `target`  | the output path and its state: `written`, `not written`, or `dry run, not written`                    |
-| `files`   | how many files are `ok`, `skipped` and `error`                                                        |
+| `files`   | how many files are `ok`, `skipped` and `error` (`partial` is added when there is such a file)                                                        |
 | `size`    | the bytes in, the bytes out and the token estimate, with thousands separators                         |
-| the rest  | one line per failed file, then one per skipped file — `status: path (reason)`; at most `max_listed` lines in all |
+| the rest  | one line per failed file, then one per partial file, then one per skipped file — `status: path (reason)`; at most `max_listed` lines in all |
 | last      | a hint, only if no file was extracted: `nothing to extract (check the source and the include/exclude rules)` |
 
 **Example usage:**
@@ -229,8 +229,17 @@ format_summary(result, max_listed=3)                    # at most three failed o
 format_summary(result, max_listed=0)                    # the counts only
 ```
 
-**Errors first.** A failed file is what a reader is looking for. Failed files are listed before skipped ones,
-and the cap `max_listed` applies to both together — so a long list of skipped files can never push an error out
+**Partial files.** A file that a step could not process fully is in the output, so it is counted on its own
+(the `partial` count appears only when there is such a file) and listed with the reason the step gave:
+
+```text
+  files  : 2 ok, 1 partial, 1 skipped, 0 errors
+  partial: src/old.py (not valid Python 3)
+  skipped: logo.png (not a text file)
+```
+
+**Errors first.** A failed file is what a reader is looking for. Failed files are listed before partial ones, and those before skipped ones,
+and the cap `max_listed` applies to all of them together — so a long list of skipped files can never push an error out
 of view. The counts on the `files` line are always complete.
 
 **No colors.** The summary is plain text. The command decides how to color it; the function stays usable in
@@ -261,20 +270,24 @@ def format_summary(
     else:
         state = "written" if result.written else "not written"
 
-    # 3. The facts
+    # 3. The facts; `partial` has a place in the counts only when there is such a file
+    counts = [f"{len(result.ok_files)} ok"]
+    if result.partial_files:
+        counts.append(f"{len(result.partial_files)} partial")
+    counts += [f"{len(result.skipped_files)} skipped", f"{len(result.error_files)} errors"]
     lines += [
         f"  source : {result.config.source}",
         f"  target : {result.target} ({state})",
-        f"  files  : {len(result.ok_files)} ok, {len(result.skipped_files)} skipped, {len(result.error_files)} errors",
+        f"  files  : {', '.join(counts)}",
         f"  size   : {result.bytes_in:,} B in -> {result.bytes_out:,} B out (~{result.tokens_estimate:,} tokens)",
     ]
 
-    # 4. Files that need a look: errors before skipped ones, capped
-    for report in (*result.error_files, *result.skipped_files)[:max_listed]:
+    # 4. Files that need a look: errors, then partial ones, then skipped ones, capped
+    for report in (*result.error_files, *result.partial_files, *result.skipped_files)[:max_listed]:
         lines.append(f"  {report.status:<7}: {report.relative} ({report.reason})")
 
     # 5. The most common mistake deserves its own hint
-    if not result.ok_files:
+    if not (result.ok_files or result.partial_files):
         lines.append("  nothing to extract (check the source and the include/exclude rules)")
 
     return "\n".join(lines)

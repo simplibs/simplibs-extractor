@@ -38,6 +38,7 @@ print(format_summary(result))
 |-------------------------------------------------------------------------------|---------------------------------------------------------------------------|
 | A **configuration that cannot run** — an unknown parameter, a missing source, an unknown profile or format | a card is **raised**, before any file is read |
 | **One file** that cannot be read or transformed                               | a line in the result (`status="error"`); the run continues                |
+| **One file** that a step could not process fully (the step warned)            | a line in the result (`status="partial"`); the file stays in the output   |
 | A **write** that fails, or is refused by the `error` policy                   | a card is **raised** — there is no output at all                          |
 | Nothing was selected, or every file failed                                    | nothing is written; the result is **unsuccessful** (`success` is `False`) |
 
@@ -54,8 +55,8 @@ code, and a script or an application does whatever it needs.
 |----------------------------------------------|----------------------------------------|---------------------------------------|
 | `Extracting <source> with profile <key>`     | info                                   | after the configuration is resolved   |
 | `Selected N file(s)`                         | info                                   | after the select phase                |
-| `<path>: ok` / `<path>: skipped (<reason>)`  | debug                                  | for every file that did not fail      |
-| `<path>: error (<reason>)`                   | warning                                | for every failed file                 |
+| `<path>: ok` / `<path>: skipped (<reason>)`  | debug                                  | for every file that is ok or skipped  |
+| `<path>: error (<reason>)`                   | warning                                | for every failed file, and `<path>: partial (<reason>)` for a partial one |
 | `Nothing to extract - no file was written`   | warning                                | no file made it into the output       |
 | `Done: <target>`                             | success — or warning if unsuccessful   | at the end                            |
 
@@ -208,8 +209,8 @@ def extract(
         if entry is not None:
             entries.append(entry)
         reports.append(report)
-        if report.status == "error":
-            log.warning("%s: error (%s)", report.relative, report.reason)
+        if report.status in ("error", "partial"):
+            log.warning("%s: %s (%s)", report.relative, report.status, report.reason)
         else:
             log.debug("%s: %s%s", report.relative, report.status, f" ({report.reason})" if report.reason else "")
 
@@ -233,7 +234,7 @@ def extract(
         written=written,
         dry_run=cfg.dry_run,
         files=tuple(reports),
-        bytes_in=sum(r.bytes_in for r in reports if r.status == "ok"),
+        bytes_in=sum(r.bytes_in for r in reports if r.status in ("ok", "partial")),
         bytes_out=len(rendered.encode("utf-8")),
         tokens_estimate=estimate_tokens(rendered),
         duration=time.perf_counter() - started,
@@ -414,7 +415,7 @@ def failure_result(
 **Parameters:** `path` (`Path`, the absolute path of the file) and `plan` (`Resolved`).
 
 **Returns:** a pair — the **final** `FileReport` of the file and its `Entry` (`None` unless the status is
-`ok`). A failure of this one file is reported, not raised.
+`ok` or `partial`). A failure of this one file is reported, not raised.
 
 It keeps `extract()` short and keeps the rule *"one bad file never stops the run"* in one place.
 
@@ -422,6 +423,11 @@ It keeps `extract()` short and keeps the rule *"one bad file never stops the run
 knows are caught. Here the code is a profile's **step**, written by someone else, and may fail in any way;
 reporting it against the file it failed on (`transform failed: …`) is the useful behaviour. A bug of this
 library would surface in the other phases, not here.
+
+**A warning makes a file partial.** A step that cannot handle a file fully returns the text as it got it and
+warns (`warnings.warn`, a `UserWarning`). The warnings of the steps of one file are collected here: the file stays in
+the output, its status is `partial` and the warning is its reason. A step that raises makes the file `error`, as
+before. See [`transform`](README_EXTRACTOR_TRANSFORM.md) for the step's side of it.
 
 **`bytes_out`** of the report is the size of the text **after** the steps, in UTF-8 bytes — what the file
 contributes to the output, so the report shows what a profile saves.
@@ -441,15 +447,26 @@ def process_source(
     if text is None:
         return report, None
 
-    # 2. Transform; the steps are code from a profile, so any error of theirs belongs to this file
-    try:
-        output = apply_steps(text, profile.steps, path.suffix)
-    except Exception as exc:
-        failed = dataclasses.replace(report, status="error", reason=f"transform failed: {describe_failure(exc)}")
-        return failed, None
+    # 2. Transform; the steps are code from a profile, so any error of theirs belongs to this file.
+    #    A step that cannot handle the file fully warns instead of failing; the warnings are collected here.
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        try:
+            output = apply_steps(text, profile.steps, path.suffix)
+        except Exception as exc:
+            failed = dataclasses.replace(report, status="error", reason=f"transform failed: {describe_failure(exc)}")
+            return failed, None
 
-    # 3. Included: remember how large the text is after the steps
-    done = dataclasses.replace(report, bytes_out=len(output.encode("utf-8")))
+    # 3. A warning of a step means the file is in the output, but not fully processed
+    reasons = _partial_reasons(caught)
+
+    # 4. Included: remember how large the text is after the steps
+    done = dataclasses.replace(
+        report,
+        status="partial" if reasons else "ok",
+        reason="; ".join(reasons) or None,
+        bytes_out=len(output.encode("utf-8")),
+    )
     return done, Entry(done.relative, path.suffix.lower(), output)
 ```
 

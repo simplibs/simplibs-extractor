@@ -38,7 +38,7 @@ is changed through the field or parameter that *starts* from it (`ExtractionConf
 | `DEFAULT_SCRIPT_NAME`   | `generate_local_script` (a folder was given instead of a file name)                             |
 | `GENERATED_MARKER`      | both built-in renderers (they write it), `is_generated_file` (it looks for it)                  |
 | `MARKER_SCAN_LINES`     | `is_generated_file`                                                                             |
-| `LANGUAGE_BY_SUFFIX`    | the `markdown` renderer                                                                         |
+| `LANGUAGE_BY_SUFFIX`    | the language registry (it starts as a copy), and through it the `markdown` renderer              |
 | `PLUGIN_GROUP`          | the default of `load_plugins(group=...)`                                                        |
 | `SCRIPT_TEMPLATE`       | `render_script`, and through it `generate_local_script` and `simplibs-extractor init`           |
 
@@ -377,7 +377,8 @@ LANGUAGE_BY_SUFFIX: Final[MappingProxyType[str, str]] = MappingProxyType({...})
 | `.tsx`           | `tsx`          | `.sh`     | `bash`      |
 | `.json`          | `json`         | `.sql`    | `sql`       |
 | `.md`            | `markdown`     | `.txt`    | `text`      |
-| `.css`           | `css`          |           |             |
+| `.css`           | `css`          | `.mjs`    | `javascript` |
+| `.cjs`           | `javascript`   |           |             |
 
 **Example usage:**
 
@@ -391,12 +392,14 @@ LANGUAGE_BY_SUFFIX.get(".rs")                                   # -> None       
 LANGUAGE_BY_SUFFIX[".py"] = "py3"                               # raises TypeError — the table is read-only
 ```
 
-**What an unknown suffix gets.** The renderer first asks this table and, if the suffix is not in it,
+**What an unknown suffix gets.** The renderer first asks the language registry (`get_language`, which starts as a copy of this table) and, if the suffix is not in it,
 uses the suffix itself without the dot — a `.rs` file is fenced as `rs`. A file **without** a suffix gets a
 plain fence with no language.
 
 **Why a suffix.** A fenced block in Markdown is highlighted by its language name, and the suffix is the
 cheapest reliable way to choose it.
+
+**Where the languages of add-ons go.** Into the language registry with `register_language`, not here: this table is the built-in starting point and it never changes.
 
 **Why read-only.** It is a `MappingProxyType`, so no caller can change the table for everyone else in the
 same process.
@@ -413,7 +416,7 @@ LANGUAGE_BY_SUFFIX: Final[MappingProxyType[str, str]] = MappingProxyType({
 })
 ```
 
-The only reader is the `markdown` renderer:
+The registry copies it when the package is imported (`LANGUAGE_REGISTRY = dict(LANGUAGE_BY_SUFFIX)`), and the `markdown` renderer asks the registry:
 
 ```python
 # 1. An empty file has nothing to fence
@@ -423,7 +426,7 @@ if not code.strip():
 
 # 2. The language of the fence from the suffix; unknown suffixes get a plain fence
 suffix = entry.suffix.lower()
-language = LANGUAGE_BY_SUFFIX.get(suffix, suffix.lstrip("."))
+language = get_language(suffix) or suffix.lstrip(".")
 return CodeBlock(code, language) if language else CodeBlock(code)
 ```
 
@@ -451,7 +454,7 @@ An add-on declares itself in its own `pyproject.toml`:
 
 ```toml
 [project.entry-points."simplibs.extractor.plugins"]
-code = "simplibs.code_extractor:register_all"
+python = "simplibs.extractor_python:register_all"
 ```
 
 and the extractor finds it **without importing it by name**:

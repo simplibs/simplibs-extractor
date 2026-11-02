@@ -5,7 +5,7 @@ from .select import resolve_config, select_sources
 from .read import is_generated_file, read_source
 
 # Phase 3: Clean the text
-from .transform import apply_steps, steps_for
+from .transform import apply_steps, by_suffix, steps_for
 
 # Phase 4: Turn entries into text
 from .render import RenderContext, build_tree, render_markdown, render_plain
@@ -31,6 +31,7 @@ __all__ = [
     "read_source",
     # Phase 3
     "apply_steps",
+    "by_suffix",
     "steps_for",
     # Phase 4
     "RenderContext",
@@ -74,6 +75,7 @@ what only the run needs.
 | `RenderContext`     | Dataclass | Phase 4: the context of a renderer.                 |
 | `apply_steps`       | Function  | Phase 3: runs the steps of a profile on a text.     |
 | `build_tree`        | Function  | Phase 4: draws a directory tree.                    |
+| `by_suffix`         | Function  | Phase 3: gives one step to a list of suffixes.      |
 | `estimate_tokens`   | Function  | Phase 6: a rough token count.                       |
 | `extract`           | Function  | The whole extraction.                               |
 | `extract_many`      | Function  | Several extractions in a row.                       |

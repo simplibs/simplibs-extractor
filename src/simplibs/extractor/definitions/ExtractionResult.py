@@ -37,8 +37,13 @@ class ExtractionResult:
 
     @property
     def ok_files(self) -> tuple[FileReport, ...]:
-        """The files that entered the output."""
+        """The files that entered the output, processed fully."""
         return tuple(report for report in self.files if report.status == "ok")
+
+    @property
+    def partial_files(self) -> tuple[FileReport, ...]:
+        """The files that entered the output, but a step could not process them fully."""
+        return tuple(report for report in self.files if report.status == "partial")
 
     @property
     def skipped_files(self) -> tuple[FileReport, ...]:
@@ -52,8 +57,8 @@ class ExtractionResult:
 
     @property
     def success(self) -> bool:
-        """True if nothing failed and at least one file entered the output."""
-        return self.fatal is None and not self.error_files and bool(self.ok_files)
+        """True if nothing failed and at least one file entered the output (whole or partial)."""
+        return self.fatal is None and not self.error_files and bool(self.ok_files or self.partial_files)
 
 
 _DESIGN_NOTES = """
@@ -66,7 +71,9 @@ this one object. Nothing is printed from inside the run.
 ## `success` Needs at Least One File
 An extraction that selected nothing is almost always a wrong filter or a
 wrong folder, so it counts as a failure (exit code 1) even though nothing
-raised.
+raised. A `partial` file is in the output, so it counts as a file; a run that
+has only partial files is successful, and `partial_files` is there for a
+caller who wants to look at them.
 
 ## A Failed Run Is a Result Too
 `fatal` carries the reason, so `extract_many` can report one broken

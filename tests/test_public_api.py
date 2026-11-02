@@ -6,7 +6,8 @@ import simplibs.extractor as extractor
 EXPECTED = {
     # Running an extraction
     "extract", "extract_many", "extract_here", "generate_local_script",
-    # Profiles and formats
+    # Profiles, formats and languages
+    "by_suffix", "get_language", "list_languages", "register_language",
     "expand_profile_keys", "get_profile", "get_renderer", "list_formats", "list_profiles",
     "list_systems", "register_profile", "register_renderer", "load_plugins",
     # Data objects
@@ -17,13 +18,13 @@ EXPECTED = {
     "FileStatus", "OutputFormat", "OverwritePolicy", "StepsSpec", "DEFAULT_PROFILE_KEY", "GENERATED_MARKER",
 }
 
-SUBPACKAGES = {"annotations", "cli", "constants", "definitions", "logic", "plugins", "registry", "scripts"}
+SUBPACKAGES = {"annotations", "cli", "constants", "definitions", "logic", "plugins", "registry", "scripts", "testing"}
 
 
 def test_the_public_names_are_exactly_the_agreed_ones() -> None:
     """Adding or removing a public name is a decision; it must change this test on purpose."""
     assert set(extractor.__all__) == EXPECTED
-    assert len(extractor.__all__) == 27
+    assert len(extractor.__all__) == 31
 
 
 def test_no_name_is_listed_twice() -> None:
@@ -62,7 +63,8 @@ def test_the_two_constants_have_their_documented_values() -> None:
 def test_the_functions_and_classes_are_what_they_say() -> None:
     for name in ["extract", "extract_many", "extract_here", "generate_local_script", "get_profile", "get_renderer",
                  "list_formats", "list_profiles", "list_systems", "register_profile", "register_renderer",
-                 "load_plugins", "expand_profile_keys", "estimate_tokens", "format_summary"]:
+                 "load_plugins", "expand_profile_keys", "estimate_tokens", "format_summary",
+                 "by_suffix", "get_language", "list_languages", "register_language"]:
         assert callable(getattr(extractor, name)), name
     for name in ["Entry", "ExtractionConfig", "ExtractionResult", "FileReport", "Profile", "RenderContext"]:
         assert isinstance(getattr(extractor, name), type), name

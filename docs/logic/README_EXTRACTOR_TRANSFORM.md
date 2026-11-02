@@ -38,22 +38,47 @@ the run is then unsuccessful.
 
 ```python
 # the loop body of extract(), shortened — the one broad `except` of the library: the steps are somebody else's code
-try:
-    output = apply_steps(text, profile.steps, path.suffix)
-except Exception as exc:
-    failed = dataclasses.replace(report, status="error", reason=f"transform failed: {describe_failure(exc)}")
-    return failed, None
+with warnings.catch_warnings(record=True) as caught:
+    warnings.simplefilter("always")
+    try:
+        output = apply_steps(text, profile.steps, path.suffix)
+    except Exception as exc:
+        failed = dataclasses.replace(report, status="error", reason=f"transform failed: {describe_failure(exc)}")
+        return failed, None
+# the warnings of the steps (UserWarning) are the reasons the file is `partial`
 ```
+
+**A step that cannot handle a file warns.** A step that does not fully understand a file — a Python 2 source for a
+Python parser, say — does not have to fail it. It returns the text as it got it and warns with
+`warnings.warn("not valid Python 3")`. The loop of the run collects the warnings of the steps of **one file**:
+the file stays in the output, its status is `partial`, and the text of the warning is its reason. The later steps of
+a chain still run.
+
+```python
+import warnings
+
+def clean(text: str) -> str:                            # a step of an add-on
+    if not parses(text):
+        warnings.warn("not valid Python 3")             # a UserWarning: the file is `partial`
+        return text                                     # the text, as it got it
+    return strip_comments(text)
+```
+
+Only `UserWarning` (the default category of `warnings.warn`, and its subclasses) counts; a `DeprecationWarning`
+from a library inside a step says something about the code, not about the file. A step that **raises** still makes
+the file `error`. The collecting is not thread-safe (`warnings.catch_warnings` changes a global), which is fine here,
+because the files are processed one after another.
 
 ## What is public
 
-Both functions are declared in the `__all__` of `simplibs.extractor.logic` and are **not** exported from the package root.
-Your programs call `extract()`; these two are documented for readers who want to know what a profile's
+All three functions are declared in the `__all__` of `simplibs.extractor.logic`. Only `by_suffix` is also exported from the package root, because every add-on needs it.
+Your programs call `extract()`; these are documented for readers who want to know what a profile's
 steps do, for tools built on the extractor and for tests.
 
 | Function      | What it does                                                         | Used by                        |
 |---------------|----------------------------------------------------------------------|--------------------------------|
 | `apply_steps` | runs the steps that apply to a file's suffix on its text             | the loop of `extract`          |
+| `by_suffix`   | gives one step to a list of suffixes (a `steps` mapping)             | add-ons, when a profile is built |
 | `steps_for`   | picks the action for a suffix out of a `StepsSpec`                   | `apply_steps`                  |
 
 ---
@@ -61,6 +86,7 @@ steps do, for tools built on the extractor and for tests.
 ## 🧭 Table of Contents
 
 * [`apply_steps`](#apply_steps)
+* [`by_suffix`](#by_suffix)
 * [`steps_for`](#steps_for)
 
 [⬅️ Back to main README](../../README.md#-the-six-phases)
@@ -171,6 +197,62 @@ def raise_step_result_error(step: Any, result: Any) -> NoReturn:
         ),
         exception=TypeError,
     )
+```
+
+</details>
+
+[▲ Back to top](#-table-of-contents)
+
+---
+
+### `by_suffix`
+
+**Gives one step to every suffix of a list** and returns the mapping `suffix -> step` that `Profile.steps`
+takes. A step sees only the text, so a profile that cleans six JavaScript suffixes alike has to say so with a
+mapping; this builds it.
+
+**Parameters:**
+
+| Name       | Type            | Description                                                      |
+|------------|-----------------|------------------------------------------------------------------|
+| `step`     | `Action`        | The pipeline of a profile.                                       |
+| `suffixes` | `Sequence[str]` | The suffixes it applies to (`".js"`, `".tsx"`).                  |
+
+**Returns:** a new `dict[str, Action]`.
+
+**Raises:** `ValidationError` — `step` is not an `Action`, or `suffixes` is not a sequence of strings.
+
+**Example usage:**
+
+```python
+from simplibs.actions import to_action
+from simplibs.extractor import Profile, by_suffix
+
+@to_action
+def upper(data: str) -> str:
+    return data.upper()
+
+steps = by_suffix(upper(), (".js", ".mjs", ".cjs"))
+# -> {'.js': <upper>, '.mjs': <upper>, '.cjs': <upper>}      the same object for every suffix
+
+Profile(system="javascript", name="shout", steps=steps)      # a profile that chooses by file type
+```
+
+**The keys are checked where they are used.** `by_suffix` does not judge whether a key is a usable suffix
+(lowercase, a dot, something after it); the `Profile` does, once, when it is built (`EXTRACTOR_PROFILE_INVALID`),
+so a mistake is reported against the profile and its name.
+
+**One object shared.** The same step is used for every suffix; a step holds no state.
+
+<details>
+<summary>🔍 Under the hood</summary>
+
+```python
+@validate_call
+def by_suffix(step: Action, suffixes: Sequence[str]) -> dict[str, Action]:
+
+    # 1. One entry per suffix
+    return {suffix: step for suffix in suffixes}
 ```
 
 </details>

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "simplibs-extractor"
-version = "0.1.1"
+version = "0.2.0"
 description = "Gathers the text files of a folder into one document: select, read, transform with steps, render as Markdown or plain text, write atomically and report — as a Python function, a command and a two-line script, with language knowledge brought by add-ons."
 readme = "README.md"
 license = "MIT"
@@ -41,7 +41,7 @@ classifiers = [
 dependencies = [
     "simplibs-exception>=1.1.4",                  # structured cards behind every error
     "simplibs-validate>=0.3.2",                   # @validate_call and @validate_dataclass
-    "simplibs-path>=0.1.1",                       # scanning, normalized and relative paths, unique names
+    "simplibs-path>=0.2.0",                       # scanning, normalized and relative paths, unique names
     "simplibs-file>=0.1.0",                       # reading, the text check, the atomic write, the backup
     "simplibs-rules>=0.4.0",                      # Rule: the include and exclude of a config and a profile
     "simplibs-actions>=0.2.2",                    # Action: the steps of a profile

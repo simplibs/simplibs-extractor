@@ -1,14 +1,15 @@
-# 🧩 `registry` — Profiles and Renderers by Name
+# 🧩 `registry` — Profiles, Renderers and Languages by Name
 
 The `registry` package is where the extractor keeps **what can be chosen by name**: the **profiles**
-(`"python/code-clean"`) and the **output formats** (`"markdown"`). Everything that is chosen by a word — the
+(`"python/code-clean"`) the **output formats** (`"markdown"`) and the **code-fence languages** of file suffixes (`".py"` → `"python"`). Everything that is chosen by a word — the
 `profile=` of a run, the `--format` of the command, the keys typed on a command line — is looked up here.
 
-There are **two registries**, each a module-level dictionary shared by the whole process:
+There are **three registries**, each a module-level dictionary shared by the whole process:
 
 | Registry          | Key                                  | Value                       | Written by                         | Read by                                              |
 |-------------------|--------------------------------------|-----------------------------|------------------------------------|------------------------------------------------------|
 | **Profiles**      | `"system/name"` (`"python/code-clean"`) | a `Profile`              | `register_profile` (add-ons, you)  | `get_profile`, `list_profiles`, `list_systems`, every run |
+| **Languages**     | the suffix (`".py"`)                 | the fence language (`"python"`) | `register_language` (the library, add-ons, you) | `get_language`, `list_languages`, the Markdown renderer |
 | **Renderers**     | the format name (`"markdown"`)       | a function `(entries, context) -> str` | `register_renderer` (the library, add-ons, you) | `get_renderer`, `list_formats`, every run |
 
 ```python
@@ -19,13 +20,13 @@ list_formats()                          # -> ['markdown', 'plain']
 get_profile("generic/all").description  # -> 'Every text file, unchanged.'
 ```
 
-Two things exist **as soon as the package is imported**: the profile `generic/all` and the formats
-`markdown` and `plain`. That is why the extractor is useful without any add-on. Nothing else is registered
+Three things exist **as soon as the package is imported**: the profile `generic/all` and the formats
+`markdown` and `plain`, and the code-fence languages of the built-in table. That is why the extractor is useful without any add-on. Nothing else is registered
 until you — or an add-on — register it.
 
 ## The dictionaries are private
 
-The two dictionaries themselves (`PROFILE_REGISTRY`, `RENDERER_REGISTRY`) are a private detail. You always go
+The three dictionaries themselves (`PROFILE_REGISTRY`, `RENDERER_REGISTRY`, `LANGUAGE_REGISTRY`) are a private detail. You always go
 through the functions: they validate what goes in, give a helpful card for what is missing, and hand out
 **copies** (`list_profiles` returns a new list), so the registry cannot be changed by accident through a
 result.
@@ -43,12 +44,12 @@ from simplibs.extractor import list_systems, load_plugins
 
 list_systems()                          # -> ['generic']
 loaded, failed = load_plugins()         # every installed add-on registers its profiles
-list_systems()                          # -> ['generic', 'python', 'react']      with simplibs-code-extractor installed
+list_systems()                          # -> ['generic', 'python']               with simplibs-extractor-python installed
 ```
 
 ## Replace, but ask for it
 
-Both `register_*` functions refuse a name that is taken, unless `replace_existing=True`. Two add-ons that
+All three `register_*` functions refuse a name or a suffix that is taken, unless `replace_existing=True`. Two add-ons that
 registered the same key would otherwise decide by import order; replacing is possible, but it has to be
 **intended**. The library's own built-ins register with `replace_existing=True`, so re-importing or reloading
 the package never fails on them.
@@ -65,6 +66,9 @@ the package never fails on them.
 | `register_renderer`   | renderers | adds a format                                                        |
 | `get_renderer`        | renderers | returns the renderer of a format — and is the check that a format exists |
 | `list_formats`        | renderers | the registered formats, sorted                                       |
+| `register_language`   | languages | adds the fence language of a file suffix                             |
+| `get_language`        | languages | returns the language of a suffix, or `None`                          |
+| `list_languages`      | languages | the registered languages, sorted by suffix                           |
 
 ---
 
@@ -84,6 +88,12 @@ the package never fails on them.
 * [`register_renderer`](#register_renderer)
 * [`get_renderer`](#get_renderer)
 * [`list_formats`](#list_formats)
+
+**Code-fence languages**
+
+* [`register_language`](#register_language)
+* [`get_language`](#get_language)
+* [`list_languages`](#list_languages)
 
 [⬅️ Back to main README](../README.md#-profiles-registry-and-add-ons)
 

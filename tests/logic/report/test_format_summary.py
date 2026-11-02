@@ -193,3 +193,67 @@ def test_max_listed_must_be_a_whole_number(max_listed) -> None:
 def test_max_listed_is_keyword_only() -> None:
     with pytest.raises(TypeError):
         format_summary(_result(_report("ok", "a.py")), 3)  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------- partial files
+
+def _partial_report(status: str, name: str, reason: str | None = None) -> FileReport:
+    return FileReport(Path(name), name, status, reason)
+
+
+def _partial_result(*reports: FileReport) -> ExtractionResult:
+    return ExtractionResult(ExtractionConfig(source=Path("project")), "python/code-clean", Path("out.md"), files=reports)
+
+
+def test_partial_files_have_their_place_in_the_counts() -> None:
+    summary = format_summary(_partial_result(_partial_report("ok", "a"), _partial_report("partial", "b", "why"), _partial_report("skipped", "c", "r")))
+    assert "  files  : 1 ok, 1 partial, 1 skipped, 0 errors" in summary
+
+
+def test_partial_the_counts_line_is_the_old_one_without_a_partial_file() -> None:
+    summary = format_summary(_partial_result(_partial_report("ok", "a"), _partial_report("skipped", "c", "r")))
+    assert "  files  : 1 ok, 1 skipped, 0 errors" in summary
+    assert "partial" not in summary
+
+
+def test_a_partial_file_is_listed_with_its_reason() -> None:
+    summary = format_summary(_partial_result(_partial_report("ok", "a"), _partial_report("partial", "src/old.py", "not valid Python 3")))
+    assert "  partial: src/old.py (not valid Python 3)" in summary
+
+
+def test_the_listing_is_errors_then_partial_then_skipped() -> None:
+    summary = format_summary(_partial_result(
+        _partial_report("skipped", "s", "r"),
+        _partial_report("partial", "p", "r"),
+        _partial_report("error", "e", "r"),
+        _partial_report("ok", "a"),
+    ))
+    listed = [
+        line.strip().split(":")[0].strip()
+        for line in summary.splitlines()
+        if line.strip().startswith(("error", "partial", "skipped"))
+    ]
+    assert listed == ["error", "partial", "skipped"]
+
+
+def test_the_cap_covers_errors_partial_and_skipped_together() -> None:
+    result = _partial_result(
+        _partial_report("ok", "a"),
+        _partial_report("skipped", "s", "r"),
+        _partial_report("partial", "p", "r"),
+        _partial_report("error", "e", "r"),
+    )
+    summary = format_summary(result, max_listed=2)
+    assert "e (r)" in summary and "p (r)" in summary
+    assert "s (r)" not in summary
+    assert "1 ok, 1 partial, 1 skipped, 1 errors" in summary          # the counts stay complete
+
+
+def test_a_run_with_only_partial_files_does_not_say_nothing_was_extracted() -> None:
+    summary = format_summary(_partial_result(_partial_report("partial", "p", "r")))
+    assert "nothing to extract" not in summary
+
+
+def test_partial_a_run_with_only_skipped_files_still_says_so() -> None:
+    summary = format_summary(_partial_result(_partial_report("skipped", "s", "r")))
+    assert "nothing to extract" in summary

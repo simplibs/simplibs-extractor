@@ -1,19 +1,23 @@
 # 🔌 `plugins` — Finding Add-Ons
 
 The extractor knows **no language and no kind of project** — on its own it only has the profile `generic/all`.
-What a Python project, a React project or your own kind of project needs — which files, which cleaning —
+What a Python project, a JavaScript project or your own kind of project needs — which files, which cleaning —
 comes from **add-ons**: separate packages that register **profiles** (and, if they want, output formats) in the
 [registry](README_EXTRACTOR_REGISTRY.md).
+
+There is **one add-on per language**, so a person installs only what the project needs:
+`simplibs-extractor-python` and `simplibs-extractor-javascript` are the first, and any other language can follow the same
+way.
 
 The `plugins` package is the half that **finds** them. It holds one function, `load_plugins`, which looks up
 every installed add-on and lets it register itself.
 
 ```
-pip install simplibs-code-extractor
+pip install simplibs-extractor-python
         │
         ▼
  entry point in the group "simplibs.extractor.plugins"
-        │      code = "simplibs.code_extractor:register_all"
+        │      python = "simplibs.extractor_python:register_all"
         ▼
  load_plugins() ──► calls register_all() ──► register_profile(...)  ──►  the registry
 ```
@@ -26,7 +30,7 @@ from simplibs.extractor import list_systems, load_plugins
 
 list_systems()                                          # -> ['generic']
 loaded, failed = load_plugins()                         # every installed add-on registers its profiles
-list_systems()                                          # -> ['generic', 'python', 'react']      with simplibs-code-extractor installed
+list_systems()                                          # -> ['generic', 'python']               with simplibs-extractor-python installed
 ```
 
 ## Using add-ons
@@ -92,6 +96,18 @@ simplibs-extractor shell scripts my_project             # -> my_project/shell_sc
 | It uses the **public API** only (`Profile`, `register_profile`, `register_renderer`, `GENERATED_MARKER`). | The add-on then keeps working when the inside of the extractor changes. |
 | It stays **quick and quiet**.                                  | A slow add-on slows every command; a loud one prints into every run.                                  |
 
+**Recommendations for the profiles of an add-on:**
+
+| Recommendation                                                                                  | Why                                                                                              |
+|-------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------|
+| Name the profiles by what they do, the same in every add-on: `code-clean`, `code-no-imports`, `outline`, `src-clean`, `data-all`. | A person who knows `python code-clean` guesses `javascript code-clean`.                          |
+| Give the add-on a **unique** entry-point name (`python`, `javascript`), not a shared one (`code`). | The name is how `load_plugins` reports the add-on, and two add-ons with one name hide each other. |
+| Use [`by_suffix(step, suffixes)`](logic/README_EXTRACTOR_TRANSFORM.md#by_suffix) for a step shared by several suffixes. | One mapping, checked once when the profile is built.                                             |
+| Let a step that cannot handle a file **warn** (`warnings.warn(...)`) and return the text as it got it; raise only for a real error. | The file stays in the output as `partial` with the warning as its reason; a raised error makes it `error` and leaves it out. |
+| Register the code-fence languages of your suffixes with [`register_language`](README_EXTRACTOR_REGISTRY.md#register_language)`(..., replace_existing=True)`. | The Markdown output is highlighted, and calling `register_all` twice still changes nothing.      |
+| Test every profile with [`assert_profile`](README_EXTRACTOR_TESTING.md) from `simplibs.extractor.testing`. | One call checks the key, the output name, which files the profile takes and what its steps do. |
+| Depend on `simplibs-extractor>=0.2.0` when you use `by_suffix`, `register_language` or `partial`. | These came with 0.2.0.                                                                           |
+
 **A failing add-on never stops the others.** An error in `register_all` — or in importing the add-on — is
 caught, and the add-on appears in the `failed` part of the answer with a one-line reason. The command line
 turns it into a warning and goes on.
@@ -136,7 +152,7 @@ from simplibs.extractor import extract, list_profiles, load_plugins
 
 # 1. The real lookup
 loaded, failed = load_plugins()
-loaded                                                  # -> ['code']        with simplibs-code-extractor installed
+loaded                                                  # -> ['python']      with simplibs-extractor-python installed
 failed                                                  # -> {}
 
 [profile.key for profile in list_profiles("python")]    # the add-on's profiles are there now

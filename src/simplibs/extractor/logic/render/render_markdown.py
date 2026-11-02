@@ -2,8 +2,9 @@ from collections.abc import Sequence
 from simplibs.markdown import CodeBlock, Document, InlineCode, MarkdownText, Paragraph
 from simplibs.markdown.presets import H1, H2
 # Outers
-from ...constants import GENERATED_MARKER, LANGUAGE_BY_SUFFIX
+from ...constants import GENERATED_MARKER
 from ...definitions import Entry
+from ...registry import get_language
 # Inners
 from .RenderContext import RenderContext
 from .build_tree import build_tree
@@ -54,7 +55,7 @@ def _code_of(entry: Entry):
 
     # 2. The language of the fence from the suffix; unknown suffixes get a plain fence
     suffix = entry.suffix.lower()
-    language = LANGUAGE_BY_SUFFIX.get(suffix, suffix.lstrip("."))
+    language = get_language(suffix) or suffix.lstrip(".")
     return CodeBlock(code, language) if language else CodeBlock(code)
 
 
@@ -72,6 +73,11 @@ so a Markdown file with its own code blocks cannot break the output.
 ## Paths Are Inline Code
 `my_file.py` as a plain heading would be escaped (`my\\_file.py`). Inline
 code shows it exactly as it is.
+
+## The Language Comes From the Registry
+`get_language` knows the built-in suffixes and those that add-ons registered
+with `register_language`; a suffix nobody knows is written after the fence as
+it is, without the dot.
 
 ## The Marker Is Plain Text
 The comment is written by hand rather than built as a node: if it ever

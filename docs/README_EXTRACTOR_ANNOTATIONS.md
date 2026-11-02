@@ -78,22 +78,23 @@ run meets an existing output. To an editor an annotated type is its plain base t
 
 ### `FileStatus`
 
-The **outcome of one file** — it entered the output, it was left out on purpose, or it failed.
+The **outcome of one file** — it entered the output whole, it entered the output but was not fully processed, it was left out on purpose, or it failed.
 
 **Definition:**
 
 ```python
-FileStatus = Literal["ok", "skipped", "error"]
+FileStatus = Literal["ok", "partial", "skipped", "error"]
 ```
 
-**Accepts:** `"ok"`, `"skipped"`, `"error"`.
+**Accepts:** `"ok"`, `"partial"`, `"skipped"`, `"error"`.
 
 **Rejects:** anything else (`"failed"`, `"OK"`, `None`) — wherever a validated function or dataclass
-declares it. The library itself only ever sets one of the three values.
+declares it. The library itself only ever sets one of the four values.
 
 | Value       | Meaning                                                                      | Examples                                                          |
 |-------------|------------------------------------------------------------------------------|-------------------------------------------------------------------|
 | `"ok"`      | The file entered the output.                                                 | a Python source, a README                                         |
+| `"partial"` | The file entered the output, but a step could not process it fully — it **warned**. | a Python source that does not parse: it is in the output as the steps left it |
 | `"skipped"` | The file was left out **on purpose** — nothing is wrong.                     | a binary file, a file larger than the limit, an earlier output of this library |
 | `"error"`   | The file failed; the run **continued** without it.                           | a read that failed, a step that raised or returned something but text |
 
@@ -110,7 +111,7 @@ result.error_files                                      # -> ()
 result.success                                          # -> True
 ```
 
-**Why three values and not two.** `skipped` is not a failure and `error` is not a stop. Keeping the two
+**Why four values and not two.** A `partial` file is in the output, so it fails nothing either. `skipped` is not a failure and `error` is not a stop. Keeping the two
 apart is what lets the report and the exit code tell *"nothing is wrong"* from *"something needs a
 look"*: a skipped file never changes the verdict, a failed file makes `success` false.
 
@@ -118,8 +119,8 @@ look"*: a skipped file never changes the verdict, a failed file makes `success` 
 <summary>🔍 Under the hood</summary>
 
 ```python
-FileStatus = Literal["ok", "skipped", "error"]
-"""The outcome of one file: included in the output, left out on purpose, or failed."""
+FileStatus = Literal["ok", "partial", "skipped", "error"]
+"""The outcome of one file: included whole, included but not fully processed, left out on purpose, or failed."""
 ```
 
 `ExtractionResult` filters its reports by this value:
@@ -131,7 +132,7 @@ def ok_files(self) -> tuple[FileReport, ...]:
 
 @property
 def success(self) -> bool:
-    return self.fatal is None and not self.error_files and bool(self.ok_files)
+    return self.fatal is None and not self.error_files and bool(self.ok_files or self.partial_files)
 ```
 
 </details>

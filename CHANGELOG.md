@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.2.0] - 2026-11-02
+
+### ✨ Added
+
+#### Profiles — helpers for add-ons
+
+* `by_suffix(step, suffixes)` — gives one step to every suffix of a list and returns the mapping `suffix -> step` that `Profile.steps` takes; every add-on wrote the same three lines before. Exported from `simplibs.extractor` and `simplibs.extractor.logic`
+
+#### Code-fence languages — a registry
+
+* `register_language(suffix, language, *, replace_existing=False)` — adds the language the Markdown output writes after the fence of a file suffix (`".lua"` → `"lua"`); a taken suffix needs `replace_existing=True`; a suffix that is not lowercase with a dot, and a name with whitespace or a backtick, are refused
+* `get_language(suffix)` — the language of a suffix (the case is ignored), or `None` if nobody registered it
+* `list_languages()` — the registered languages sorted by suffix, as a new dictionary
+* `.mjs` and `.cjs` in the built-in table `LANGUAGE_BY_SUFFIX`; the registry starts as a copy of it and the table itself stays read-only
+* The Markdown renderer asks the registry, so the languages that add-ons register are highlighted too
+
+#### A file that was processed only partly
+
+* New file status `"partial"` — the file is in the output, but a step could not process it fully (a Python source that does not parse, say). A step that cannot handle a file returns the text as it got it and warns (`warnings.warn(...)`, a `UserWarning`); the extractor collects the warnings of the steps of one file and reports the file as `partial`, with the text of the warning as the reason. Other warning categories (`DeprecationWarning`, ...) are not counted; a step that raises still makes the file `error`
+* `ExtractionResult.partial_files`; `success` counts a partial file as a file in the output, so a run that has only partial files is successful
+* `format_summary` shows `partial` in the counts only when there is such a file, and lists partial files between the failed and the skipped ones
+* The run logs a partial file as a warning
+
+#### Testing — tools for the add-ons
+
+* `simplibs.extractor.testing` — a new package for testing the profiles of an add-on; the package root does not import it, and it needs `pytest` 9 or newer (the report is built from the native `subtests` fixture; `pip install simplibs-extractor[dev]`)
+* `assert_profile(subtests, profile, ...)` — checks everything a profile promises in one call, with a subtest for each thing it checks, so one run shows everything that is wrong with a profile: the key and a one-line description, the output name and format, which relative paths the `include` and `exclude` rules take and leave out, and what the steps do to a text, suffix by suffix
+* The three blades behind it, which can also be called alone from `simplibs.extractor.testing.asserts`: `assert_profile_identity`, `assert_profile_selection` and `assert_profile_steps`; a blade runs only when there is data for it
+* A mistake of the test itself (a path in both lists, a suffix that no file can have, a first argument that is not a `Profile`) is an `AssertionError` raised at once, before any subtest; the tools define no exceptions of their own and raise no cards
+* `testing` is the last layer of the package (`... ← scripts ← cli ← testing`): it may look at everything and nothing looks at it
+
+### 🔄 Changed
+
+* `FileStatus` has a fourth value; code that handles the three old ones with an exhaustive `match` needs a branch for `"partial"`
+* The size of a partial file counts in `ExtractionResult.bytes_in`, like the size of an `ok` file
+
+### 📚 Documentation
+
+* `README_EXTRACTOR_TRANSFORM` (`by_suffix`, a step that warns), `README_EXTRACTOR_REGISTRY` (languages), `README_EXTRACTOR_CONSTANTS`, `README_EXTRACTOR_ANNOTATIONS`, `README_EXTRACTOR_DEFINITIONS`, `README_EXTRACTOR_REPORT`, `README_EXTRACTOR_RUN` and the main `README`
+* `README_EXTRACTOR_PLUGINS`: recommendations for the profiles of an add-on
+* `README_EXTRACTOR_TESTING` (new): `assert_profile` and its three blades, and a `testing` section in the main `README`
+
+---
+
 ## [0.1.1] - 2026-10-31
 
 ### 🐛 Fixed

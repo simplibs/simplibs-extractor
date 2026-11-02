@@ -7,7 +7,7 @@ PACKAGE = Path(simplibs.extractor.__file__).parent
 TESTS = Path(__file__).parent
 
 # Every layer looks only at the layers before it (to the left).
-LAYERS = ["annotations", "constants", "definitions", "registry", "logic", "plugins", "scripts", "cli"]
+LAYERS = ["annotations", "constants", "definitions", "registry", "logic", "plugins", "scripts", "cli", "testing"]
 
 ROOT_FILES = {"__init__.py", "__main__.py"}
 

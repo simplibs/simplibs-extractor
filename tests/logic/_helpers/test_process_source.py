@@ -3,6 +3,7 @@ import pytest
 from simplibs.extractor.definitions import Entry, Profile
 from simplibs.extractor.logic._helpers import process_source
 from simplibs.extractor.logic.select import resolve_config
+import warnings
 
 
 @pytest.fixture
@@ -183,3 +184,144 @@ def test_the_steps_are_not_run_for_a_skipped_file(root, make_action) -> None:
     profile = Profile("t", "spy", steps=make_action(lambda text: seen.append(text) or text))
     process_source(path, _plan(root, profile=profile))
     assert seen == []
+
+
+# ---------------------------------------------------------------- a warning makes the file partial
+
+def _warns_with(message: str, category=UserWarning):
+    """A step that cannot handle the file: it warns and returns the text as it got it."""
+
+    def step(text):
+        warnings.warn(message, category)
+        return text
+
+    return step
+
+
+def test_a_step_that_warns_makes_the_file_partial(root, make_action) -> None:
+    path = _write(root, "a.py", "x = 1\n")
+    profile = Profile("t", "warn", steps=make_action(_warns_with("not valid Python 3")))
+    report, entry = process_source(path, _plan(root, profile=profile))
+    assert report.status == "partial"
+    assert report.reason == "not valid Python 3"
+
+
+def test_a_partial_file_is_in_the_output(root, make_action) -> None:
+    path = _write(root, "a.py", "x = 1\n")
+    profile = Profile("t", "warn", steps=make_action(_warns_with("w")))
+    _, entry = process_source(path, _plan(root, profile=profile))
+    assert entry == Entry("a.py", ".py", "x = 1\n")
+
+
+def test_a_partial_report_keeps_what_was_known_about_the_file(root, make_action) -> None:
+    path = _write(root, "sub/a.py", "x = 1\n")
+    profile = Profile("t", "warn", steps=make_action(_warns_with("w")))
+    report, _ = process_source(path, _plan(root, profile=profile))
+    assert report.path == path
+    assert report.relative == "sub/a.py"
+    assert report.bytes_in == len("x = 1\n")
+    assert report.bytes_out == len("x = 1\n")
+
+
+def test_the_later_steps_of_a_chain_still_run(root, make_action) -> None:
+    """A warning does not stop the pipeline: the next step gets the text and works on it."""
+    path = _write(root, "a.py", "abc\n")
+    profile = Profile("t", "chain", steps=make_action(_warns_with("w"), name="First") >> make_action(str.upper, name="Second"))
+    report, entry = process_source(path, _plan(root, profile=profile))
+    assert report.status == "partial"
+    assert entry.text == "ABC\n"
+
+
+def test_the_size_after_the_steps_is_counted_for_a_partial_file(root, make_action) -> None:
+    path = _write(root, "a.txt", "hello\n")
+
+    def warns_and_grows(text):
+        warnings.warn("grown")
+        return text + "žž\n"
+
+    report, entry = process_source(path, _plan(root, profile=Profile("t", "grow", steps=make_action(warns_and_grows))))
+    assert report.status == "partial"
+    assert report.bytes_out == len("hello\nžž\n".encode("utf-8"))
+
+
+def test_the_same_warning_twice_is_one_reason(root, make_action) -> None:
+    path = _write(root, "a.py", "x\n")
+
+    def twice(text):
+        warnings.warn("same")
+        warnings.warn("same")
+        return text
+
+    report, _ = process_source(path, _plan(root, profile=Profile("t", "twice", steps=make_action(twice))))
+    assert report.reason == "same"
+
+
+def test_different_warnings_are_joined_in_the_order_they_came(root, make_action) -> None:
+    path = _write(root, "a.py", "x\n")
+
+    def two(text):
+        warnings.warn("first")
+        warnings.warn("second")
+        return text
+
+    report, _ = process_source(path, _plan(root, profile=Profile("t", "two", steps=make_action(two))))
+    assert report.reason == "first; second"
+
+
+def test_a_long_warning_becomes_one_line(root, make_action) -> None:
+    path = _write(root, "a.py", "x\n")
+    profile = Profile("t", "long", steps=make_action(_warns_with("first line\n   second   line\n")))
+    report, _ = process_source(path, _plan(root, profile=profile))
+    assert report.reason == "first line second line"
+    assert "\n" not in report.reason
+
+
+@pytest.mark.parametrize("category", [DeprecationWarning, FutureWarning, RuntimeWarning, ResourceWarning])
+def test_other_warning_categories_say_nothing_about_the_file(root, make_action, category) -> None:
+    path = _write(root, "a.py", "x\n")
+    profile = Profile("t", "other", steps=make_action(_warns_with("about the code", category)))
+    report, entry = process_source(path, _plan(root, profile=profile))
+    assert report.status == "ok"
+    assert report.reason is None
+    assert entry is not None
+
+
+def test_a_subclass_of_user_warning_counts(root, make_action) -> None:
+    class SourceNotValid(UserWarning):
+        pass
+
+    path = _write(root, "a.py", "x\n")
+    profile = Profile("t", "sub", steps=make_action(_warns_with("custom", SourceNotValid)))
+    report, _ = process_source(path, _plan(root, profile=profile))
+    assert report.status == "partial"
+
+
+def test_a_step_without_a_warning_leaves_the_file_ok(root, make_action) -> None:
+    path = _write(root, "a.py", "x\n")
+    report, _ = process_source(path, _plan(root, profile=Profile("t", "up", steps=make_action(str.upper))))
+    assert report.status == "ok"
+    assert report.reason is None
+
+
+def test_a_step_that_warns_and_then_raises_is_an_error(root, make_action) -> None:
+    path = _write(root, "a.py", "x\n")
+
+    def both(text):
+        warnings.warn("w")
+        raise RuntimeError("boom")
+
+    report, entry = process_source(path, _plan(root, profile=Profile("t", "both", steps=make_action(both))))
+    assert entry is None
+    assert report.status == "error"
+    assert report.reason == "transform failed: RuntimeError: boom"
+
+
+def test_the_warnings_settings_of_the_caller_come_back(root, make_action) -> None:
+    path = _write(root, "a.py", "x\n")
+    profile = Profile("t", "warn", steps=make_action(_warns_with("w")))
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        report, _ = process_source(path, _plan(root, profile=profile))
+        assert report.status == "partial"          # even when warnings are errors outside
+        with pytest.raises(UserWarning):
+            warnings.warn("outside")               # and the filter of the caller is back afterwards

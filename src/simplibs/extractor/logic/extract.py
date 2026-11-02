@@ -58,8 +58,8 @@ def extract(
         if entry is not None:
             entries.append(entry)
         reports.append(report)
-        if report.status == "error":
-            log.warning("%s: error (%s)", report.relative, report.reason)
+        if report.status in ("error", "partial"):
+            log.warning("%s: %s (%s)", report.relative, report.status, report.reason)
         else:
             log.debug("%s: %s%s", report.relative, report.status, f" ({report.reason})" if report.reason else "")
 
@@ -83,7 +83,7 @@ def extract(
         written=written,
         dry_run=cfg.dry_run,
         files=tuple(reports),
-        bytes_in=sum(r.bytes_in for r in reports if r.status == "ok"),
+        bytes_in=sum(r.bytes_in for r in reports if r.status in ("ok", "partial")),
         bytes_out=len(rendered.encode("utf-8")),
         tokens_estimate=estimate_tokens(rendered),
         duration=time.perf_counter() - started,

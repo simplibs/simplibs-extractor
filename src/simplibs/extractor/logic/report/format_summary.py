@@ -31,20 +31,24 @@ def format_summary(
     else:
         state = "written" if result.written else "not written"
 
-    # 3. The facts
+    # 3. The facts; `partial` has a place in the counts only when there is such a file
+    counts = [f"{len(result.ok_files)} ok"]
+    if result.partial_files:
+        counts.append(f"{len(result.partial_files)} partial")
+    counts += [f"{len(result.skipped_files)} skipped", f"{len(result.error_files)} errors"]
     lines += [
         f"  source : {result.config.source}",
         f"  target : {result.target} ({state})",
-        f"  files  : {len(result.ok_files)} ok, {len(result.skipped_files)} skipped, {len(result.error_files)} errors",
+        f"  files  : {', '.join(counts)}",
         f"  size   : {result.bytes_in:,} B in -> {result.bytes_out:,} B out (~{result.tokens_estimate:,} tokens)",
     ]
 
-    # 4. Files that need a look: errors before skipped ones, capped
-    for report in (*result.error_files, *result.skipped_files)[:max_listed]:
+    # 4. Files that need a look: errors, then partial ones, then skipped ones, capped
+    for report in (*result.error_files, *result.partial_files, *result.skipped_files)[:max_listed]:
         lines.append(f"  {report.status:<7}: {report.relative} ({report.reason})")
 
     # 5. The most common mistake deserves its own hint
-    if not result.ok_files:
+    if not (result.ok_files or result.partial_files):
         lines.append("  nothing to extract (check the source and the include/exclude rules)")
 
     return "\n".join(lines)

@@ -5,14 +5,18 @@ from .scripts import extract_here, generate_local_script
 # Profiles and formats
 from .registry import (
     expand_profile_keys,
+    get_language,
     get_profile,
     get_renderer,
     list_formats,
+    list_languages,
     list_profiles,
     list_systems,
+    register_language,
     register_profile,
     register_renderer,
 )
+from .logic import by_suffix
 from .plugins import load_plugins
 
 # Data objects
@@ -33,13 +37,17 @@ __all__ = [
     "extract_many",
     "extract_here",
     "generate_local_script",
-    # Profiles and formats
+    # Profiles, formats and languages
+    "by_suffix",
     "expand_profile_keys",
+    "get_language",
     "get_profile",
     "get_renderer",
     "list_formats",
+    "list_languages",
     "list_profiles",
     "list_systems",
+    "register_language",
     "register_profile",
     "register_renderer",
     "load_plugins",
@@ -96,6 +104,10 @@ logger libraries it would never use.
 | `list_systems`           | Function  | Lists the systems that have a profile.                         |
 | `expand_profile_keys`    | Function  | Turns typed names into full profile keys.                      |
 | `register_renderer`      | Function  | Adds an output format.                                         |
+| `register_language`      | Function  | Adds the code-fence language of a file suffix.                 |
+| `get_language`           | Function  | Returns the fence language of a suffix, or `None`.             |
+| `list_languages`         | Function  | Lists the registered fence languages.                          |
+| `by_suffix`              | Function  | Gives one step to a list of suffixes: a `steps` mapping.       |
 | `get_renderer`           | Function  | Returns the renderer of a format.                              |
 | `list_formats`           | Function  | Lists the registered output formats.                           |
 | `load_plugins`           | Function  | Lets every installed add-on register its profiles.             |
@@ -107,7 +119,7 @@ logger libraries it would never use.
 | `RenderContext`          | Dataclass | What a renderer knows besides the entries.                     |
 | `format_summary`         | Function  | Readable text from an `ExtractionResult`.                      |
 | `estimate_tokens`        | Function  | A rough token count of a text.                                 |
-| `FileStatus`             | Type      | `ok`, `skipped` or `error`.                                    |
+| `FileStatus`             | Type      | `ok`, `partial`, `skipped` or `error`.                         |
 | `OutputFormat`           | Type      | The name of an output format.                                  |
 | `OverwritePolicy`        | Type      | `overwrite`, `unique`, `backup` or `error`.                    |
 | `StepsSpec`              | Type      | One action, a suffix -> action mapping, or nothing.            |

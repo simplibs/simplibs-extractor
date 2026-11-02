@@ -11,8 +11,8 @@ class FileReport:
     Attributes:
         path: The absolute path of the file.
         relative: The path relative to the source, with `/` separators.
-        status: `ok`, `skipped` or `error`.
-        reason: Why the file was skipped or failed; `None` for `ok`.
+        status: `ok`, `partial`, `skipped` or `error`.
+        reason: Why the file was partial, skipped or failed; `None` for `ok`.
         bytes_in: The size of the original text, in bytes.
         bytes_out: The size of the text after the steps, in bytes.
     """
@@ -30,8 +30,8 @@ _DESIGN_NOTES = """
 
 ## Purpose
 The per-file record behind the summary, the exit code and a later JSON
-report. A skipped or failed file keeps its reason, so "why is my file
-missing?" always has an answer.
+report. A partial, skipped or failed file keeps its reason, so "why is my
+file missing, or not cleaned?" always has an answer.
 
 ## `relative` Next to `path`
 The report is read by people (relative, stable across machines); the

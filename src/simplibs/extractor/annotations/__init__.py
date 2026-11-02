@@ -15,7 +15,7 @@ Plain imports, no `__all__` (the package root decides what is public).
 
 | Component         | Type            | Description                                             |
 | :---------------- | :-------------- | :------------------------------------------------------ |
-| `FileStatus`      | Literal Type    | Outcome of one file: `ok`, `skipped`, `error`.          |
+| `FileStatus`      | Literal Type    | Outcome of one file: `ok`, `partial`, `skipped`, `error`. |
 | `OutputFormat`    | Annotated Type  | The name of an output format.                           |
 | `OverwritePolicy` | Literal Type    | What to do when the output exists.                      |
 | `StepsSpec`       | Union Type      | One action, a suffix -> action mapping, or nothing.     |

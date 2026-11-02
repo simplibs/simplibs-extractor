@@ -76,3 +76,41 @@ def test_result_is_frozen() -> None:
 def test_result_uses_slots() -> None:
     """No per-instance __dict__."""
     assert not hasattr(_result("ok"), "__dict__")
+
+
+# ---------------------------------------------------------------- partial files
+
+def test_partial_files_hold_the_partial_reports_in_order() -> None:
+    result = _result("ok", "partial", "skipped", "partial", "error")
+    assert [report.relative for report in result.partial_files] == ["f1.txt", "f3.txt"]
+
+
+def test_partial_files_are_a_tuple_and_empty_without_files() -> None:
+    assert isinstance(_result("partial").partial_files, tuple)
+    assert _result().partial_files == ()
+
+
+def test_the_other_groups_do_not_hold_partial_files() -> None:
+    result = _result("partial")
+    assert result.ok_files == result.skipped_files == result.error_files == ()
+
+
+def test_the_groups_together_cover_every_file_once() -> None:
+    result = _result("ok", "partial", "skipped", "error", "partial")
+    groups = (result.ok_files, result.partial_files, result.skipped_files, result.error_files)
+    assert sum(len(group) for group in groups) == len(result.files)
+
+
+@pytest.mark.parametrize(
+    "statuses, fatal, expected",
+    [
+        (("partial",), None, True),                 # a partial file is in the output
+        (("partial", "partial"), None, True),
+        (("ok", "partial"), None, True),
+        (("partial", "skipped"), None, True),
+        (("partial", "error"), None, False),        # one failure still fails the run
+        (("partial",), "the run stopped", False),   # a fatal reason always wins
+    ],
+)
+def test_success_with_partial_files(statuses, fatal, expected) -> None:
+    assert _result(*statuses, fatal=fatal).success is expected
